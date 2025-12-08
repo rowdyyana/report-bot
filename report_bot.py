@@ -1,25 +1,29 @@
 import os
-import telebot
-from telebot import types
 from datetime import datetime
 
+import telebot
+from telebot import types
 
+# ================== НАСТРОЙКИ ==================
+
+# Берём токен и ID чата менеджера из переменных окружения
 TOKEN = os.getenv("TOKEN")
 MANAGER_CHAT_ID = os.getenv("MANAGER_CHAT_ID")
+
+if not TOKEN:
+    raise RuntimeError("❌ Не задан TOKEN в переменных окружения!")
 
 if MANAGER_CHAT_ID is not None:
     try:
         MANAGER_CHAT_ID = int(MANAGER_CHAT_ID)
     except ValueError:
-        print("⚠ Ошибка: MANAGER_CHAT_ID в переменных окружения не число.")
+        print("⚠ MANAGER_CHAT_ID в переменных окружения не число. Игнорирую.")
         MANAGER_CHAT_ID = None
-
-if not TOKEN:
-    raise RuntimeError("❌ Не задан TOKEN в переменных окружения!")
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-# Шаги "машины состояний"
+# ================== КОНСТАНТЫ ШАГОВ ==================
+
 STEP_DATE = 1
 STEP_VITRINA = 2
 STEP_EDUCATION = 3
@@ -30,6 +34,8 @@ STEP_EXTRA = 7
 
 user_state = {}
 user_report = {}
+
+# ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
 
 
 def init_report(user_id: int):
@@ -64,6 +70,9 @@ def ask_date(chat_id: int):
         ),
         reply_markup=kb,
     )
+
+
+# ================== ХЕНДЛЕРЫ ==================
 
 
 @bot.message_handler(commands=["start"])
@@ -245,15 +254,8 @@ def handle_extra(message):
     )
 
     # Отправляем отчёт самому менеджеру
-    bot.send_message(
-        user_id,
-        "✅ Отчёт сформирован, вот он:",
-    )
-    bot.send_message(
-        user_id,
-        text,
-        reply_markup=main_keyboard(),
-    )
+    bot.send_message(user_id, "✅ Отчёт сформирован, вот он:")
+    bot.send_message(user_id, text, reply_markup=main_keyboard())
 
     # Дублируем отчёт в общий менеджерский чат, если указан
     if MANAGER_CHAT_ID is not None:
@@ -264,18 +266,15 @@ def handle_extra(message):
     user_report.pop(user_id, None)
 
 
-if __name__ == "__main__":
-    print("Бот запущен на Railway (или локально). Нажми Ctrl+C, чтобы остановить локально.")
-    # На всякий случай задаём таймауты, чтобы бот лучше переживал обрывы соединения
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+# ================== ЗАПУСК (ПК + Render) ==================
 
 if __name__ == "__main__":
     print("Бот запущен.")
 
-    # --- Fake webserver for Render (чтобы сервис не падал из-за порта) ---
+    # --- Fake webserver for Render (чтобы Web Service не падал из-за порта) ---
+    # На обычном ПК это тоже работает, просто открывает локальный порт.
     import threading
     from flask import Flask
-    import os
 
     app = Flask(__name__)
 
@@ -287,7 +286,9 @@ if __name__ == "__main__":
         port = int(os.environ.get("PORT", 10000))
         app.run(host="0.0.0.0", port=port)
 
-    threading.Thread(target=run_flask).start()
-    # --------------------------------------------------------------------
+    threading.Thread(target=run_flask, daemon=True).start()
+    # -------------------------------------------------------------------------
 
+    # Запускаем Telegram-бота (long polling)
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
