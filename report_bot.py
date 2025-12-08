@@ -268,3 +268,26 @@ if __name__ == "__main__":
     print("Бот запущен на Railway (или локально). Нажми Ctrl+C, чтобы остановить локально.")
     # На всякий случай задаём таймауты, чтобы бот лучше переживал обрывы соединения
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
+if __name__ == "__main__":
+    print("Бот запущен.")
+
+    # --- Fake webserver for Render (чтобы сервис не падал из-за порта) ---
+    import threading
+    from flask import Flask
+    import os
+
+    app = Flask(__name__)
+
+    @app.route("/")
+    def home():
+        return "Bot is running", 200
+
+    def run_flask():
+        port = int(os.environ.get("PORT", 10000))
+        app.run(host="0.0.0.0", port=port)
+
+    threading.Thread(target=run_flask).start()
+    # --------------------------------------------------------------------
+
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
