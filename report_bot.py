@@ -4,9 +4,9 @@ from datetime import datetime
 import telebot
 from telebot import types
 
-# ================== НАСТРОЙКИ ==================
+# =============== НАСТРОЙКИ ===============
 
-# Берём токен и ID чата менеджера из переменных окружения
+# Токен и ID менеджерского чата берём из переменных окружения
 TOKEN = os.getenv("TOKEN")
 MANAGER_CHAT_ID = os.getenv("MANAGER_CHAT_ID")
 
@@ -22,20 +22,21 @@ if MANAGER_CHAT_ID is not None:
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-# ================== КОНСТАНТЫ ШАГОВ ==================
+# =============== КОНСТАНТЫ ШАГОВ ===============
 
 STEP_DATE = 1
 STEP_VITRINA = 2
 STEP_EDUCATION = 3
 STEP_TASKS = 4
 STEP_COACHING = 5
-STEP_COMPLAINTS = 6
-STEP_EXTRA = 7
+STEP_SALEBOT = 6
+STEP_ROCKET = 7
+STEP_EXTRA = 8
 
 user_state = {}
 user_report = {}
 
-# ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
+# =============== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===============
 
 
 def init_report(user_id: int):
@@ -46,7 +47,8 @@ def init_report(user_id: int):
         "education": "",
         "tasks": "",
         "coaching": "",
-        "complaints": "",
+        "salebot": "",
+        "rocket": "",
         "extra": "",
     }
 
@@ -72,7 +74,7 @@ def ask_date(chat_id: int):
     )
 
 
-# ================== ХЕНДЛЕРЫ ==================
+# =============== ХЕНДЛЕРЫ ===============
 
 
 @bot.message_handler(commands=["start"])
@@ -126,7 +128,7 @@ def handle_date(message):
     elif text.lower().startswith("ввести дату"):
         bot.send_message(
             message.chat.id,
-            "Напиши дату в формате ДД.ММ.ГГГГ (например, 08.12.2025).",
+            "Напиши дату в формате ДД.ММ.ГГГГ (например, 18.12.2025).",
             reply_markup=types.ReplyKeyboardRemove(),
         )
         return
@@ -137,7 +139,7 @@ def handle_date(message):
         except ValueError:
             bot.send_message(
                 message.chat.id,
-                "Не понял дату 🙈 Напиши в формате ДД.ММ.ГГГГ (например, 08.12.2025).",
+                "Не понял дату 🙈 Напиши в формате ДД.ММ.ГГГГ (например, 18.12.2025).",
             )
             return
 
@@ -208,29 +210,46 @@ def handle_coaching(message):
     """Блок по коучингу."""
     user_id = message.from_user.id
     user_report[user_id]["coaching"] = message.text.strip()
-    user_state[user_id] = STEP_COMPLAINTS
+    user_state[user_id] = STEP_SALEBOT
 
     bot.send_message(
         message.chat.id,
         (
-            "5️⃣ <b>Жалобы моделей</b>\n"
-            "Если были: ID, суть жалобы, что сделали."
+            "5️⃣ <b>Работа в сейлботе</b> (необязательно)\n"
+            "Опиши работу в сейлботе за сегодня, если она была."
         ),
     )
 
 
-@bot.message_handler(func=lambda m: user_state.get(m.from_user.id) == STEP_COMPLAINTS)
-def handle_complaints(message):
-    """Блок по жалобам."""
+@bot.message_handler(func=lambda m: user_state.get(m.from_user.id) == STEP_SALEBOT)
+def handle_salebot(message):
+    """Блок по сейлботу (необязательный)."""
     user_id = message.from_user.id
-    user_report[user_id]["complaints"] = message.text.strip()
+    user_report[user_id]["salebot"] = message.text.strip()
+    user_state[user_id] = STEP_ROCKET
+
+    bot.send_message(
+        message.chat.id,
+        (
+            "6️⃣ <b>Заявки в Рокете</b> (необязательно)\n"
+            "Опиши работу с заявками в Рокете за сегодня, если она была."
+        ),
+    )
+
+
+@bot.message_handler(func=lambda m: user_state.get(m.from_user.id) == STEP_ROCKET)
+def handle_rocket(message):
+    """Блок по заявкам в Рокете (необязательный)."""
+    user_id = message.from_user.id
+    user_report[user_id]["rocket"] = message.text.strip()
     user_state[user_id] = STEP_EXTRA
 
     bot.send_message(
         message.chat.id,
         (
-            "6️⃣ <b>Дополнительно</b>\n"
-            "Любые важные моменты за день: проблемы, предложения, модели на контроле."
+            "7️⃣ <b>Дополнительно</b>\n"
+            "Любые важные моменты за день: проблемы, предложения, модели на контроле, "
+            "что хотите донести руководителю."
         ),
     )
 
@@ -249,8 +268,9 @@ def handle_extra(message):
         f"2️⃣ <b>Обучения</b>\n{rep['education']}\n\n"
         f"3️⃣ <b>Таск-трекер</b>\n{rep['tasks']}\n\n"
         f"4️⃣ <b>Таблица коучинга</b>\n{rep['coaching']}\n\n"
-        f"5️⃣ <b>Жалобы моделей</b>\n{rep['complaints']}\n\n"
-        f"6️⃣ <b>Дополнительно</b>\n{rep['extra']}"
+        f"5️⃣ <b>Работа в сейлботе</b>\n{rep['salebot']}\n\n"
+        f"6️⃣ <b>Заявки в Рокете</b>\n{rep['rocket']}\n\n"
+        f"7️⃣ <b>Дополнительно</b>\n{rep['extra']}"
     )
 
     # Отправляем отчёт самому менеджеру
@@ -266,29 +286,17 @@ def handle_extra(message):
     user_report.pop(user_id, None)
 
 
-# ================== ЗАПУСК (ПК + Render) ==================
+# =============== ЗАПУСК (ПК + Railway) ===============
 
 if __name__ == "__main__":
     print("Бот запущен.")
 
-    # --- Fake webserver for Render (чтобы Web Service не падал из-за порта) ---
-    # На обычном ПК это тоже работает, просто открывает локальный порт.
-    import threading
-    from flask import Flask
+    # Делаем бота устойчивым к обрывам соединения
+    import time
 
-    app = Flask(__name__)
-
-    @app.route("/")
-    def home():
-        return "Bot is running", 200
-
-    def run_flask():
-        port = int(os.environ.get("PORT", 10000))
-        app.run(host="0.0.0.0", port=port)
-
-    threading.Thread(target=run_flask, daemon=True).start()
-    # -------------------------------------------------------------------------
-
-    # Запускаем Telegram-бота (long polling)
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
-
+    while True:
+        try:
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            print(f"Polling error: {e}")
+            time.sleep(3)
